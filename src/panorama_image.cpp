@@ -7,6 +7,7 @@
 #include "image.h"
 #include "matrix.h"
 
+#include <iostream>
 #include <set>
 #include <thread>
 
@@ -53,7 +54,6 @@ Image both_images(const Image& a, const Image& b)
 Image draw_matches(const Image& a, const Image& b, const vector<Match>& matches, const vector<Match>& inliers)
   {
   Image both = both_images(a, b);
-  
   for(int i = 0; i < (int)matches.size(); ++i)
     {
     int bx = matches[i].a->p.x; 
@@ -111,6 +111,7 @@ Image find_and_draw_matches(const Image& a, const Image& b, float sigma, float t
   
   Image A=mark_corners(a, ad);
   Image B=mark_corners(b, bd);
+  
   Image lines = draw_matches(A, B, m, {});
   
   return lines;
@@ -125,10 +126,13 @@ float l1_distance(const vector<float>& a,const vector<float>& b)
   assert(a.size()==b.size() && "Arrays must have same size\n");
   
   // TODO: return the correct number.
+  float distance = 0.0;
+
+  for(int i=0; i<a.size(); i++){
+    distance += std::abs(a[i]-b[i]);
+  }
   
-  NOT_IMPLEMENTED();
-  
-  return 0;
+  return distance;
   }
 
 // HW5 2.2a
@@ -138,18 +142,22 @@ float l1_distance(const vector<float>& a,const vector<float>& b)
 vector<int> match_descriptors_a2b(const vector<Descriptor>& a, const vector<Descriptor>& b)
   {
   vector<int> ind;
-  for(int j=0;j<(int)a.size();j++)
-    {
+  for(int j=0;j<(int)a.size();j++){
     int bind = -1; // <- find the best match (-1: no match)
     float best_distance=1e10f;  // <- best distance
-    
     // TODO: find the best 'bind' descriptor in b that best matches a[j]
     // TODO: put your code here:
-    
-    NOT_IMPLEMENTED();
+    ind.push_back(bind);
+    float temp_dist;
+    for(int i=0; i<(int)b.size(); i++){
+      temp_dist = l1_distance(a[j].data, b[i].data);
+      if (temp_dist<best_distance){
+        best_distance = temp_dist;
+        ind[j] = i;
+      }
     }
+  }
   return ind;
-  
   }
 
 
@@ -163,12 +171,32 @@ vector<Match> match_descriptors(const vector<Descriptor>& a, const vector<Descri
   if(a.size()==0 || b.size()==0)return {};
   
   vector<Match> m;
-  
+
   // TODO: use match_descriptors_a2b(a,b) and match_descriptors_a2b(b,a)
   // and populate `m` with good matches!
+  vector<int> a2b = match_descriptors_a2b(a,b);
+  vector<int> b2a = match_descriptors_a2b(b,a);
   
-  NOT_IMPLEMENTED();
-  
+  vector<int> a_matches;
+  vector<int> b_matches;
+
+  // Check only for good matches to put in m
+  for(int j=0; j<a2b.size(); j++){
+    int value = a2b[j];
+    if(b2a[value]==j){
+      a_matches.push_back(j);
+      b_matches.push_back(value);
+    }
+  }
+
+  // m.reserve(a2b.size());
+  m.resize(a_matches.size());
+
+  for(int i=0; i<a_matches.size(); i++){
+    m[i].a = &a[a_matches[i]];
+    m[i].b = &b[b_matches[i]];
+  }
+
   return m;
   }
 
@@ -184,10 +212,16 @@ Point project_point(const Matrix& H, const Point& p)
   // Remember that homogeneous coordinates are equivalent up to scalar.
   // Have to divide by.... something...
   
-  NOT_IMPLEMENTED();
+  Point New_point;
+
+  // Constant to normalize
+  float norm = H[2][0]*p.x + H[2][1]*p.y + H[2][2];
   
-  
-  return Point(0,0);
+  // Remember to normalize point from homogeneous to cartesian coordinates
+  New_point.x = (H[0][0]*p.x + H[0][1]*p.y + H[0][2])/norm;
+  New_point.y = (H[1][0]*p.x + H[1][1]*p.y + H[1][2])/norm;
+
+  return New_point;
   }
 
 // HW5 3.2a
@@ -197,8 +231,10 @@ Point project_point(const Matrix& H, const Point& p)
 double point_distance(const Point& p, const Point& q)
   {
   // TODO: should be a quick one.
-  NOT_IMPLEMENTED();
-  return 0;
+  
+  double dist = std::sqrt(std::pow((p.x-q.x),2) + std::pow((p.y-q.y),2));
+
+  return dist;
   }
 
 // HW5 3.2b
@@ -213,8 +249,13 @@ vector<Match> model_inliers(const Matrix& H, const vector<Match>& m, float thres
   vector<Match> inliers;
   // TODO: fill inliers
   // i.e. distance(H*a.p, b.p) < thresh
-  
-  NOT_IMPLEMENTED();
+
+  for(int i=0; i<m.size(); i++){
+    float dist = point_distance(project_point(H, m[i].a->p), m[i].b->p);
+    if(dist < thresh){
+      inliers.push_back(m[i]);
+    }
+  }
   
   return inliers;
   }
@@ -227,8 +268,13 @@ void randomize_matches(vector<Match>& m)
   // TODO: implement Fisher-Yates to shuffle the array.
   // You might want to use the swap function like:
   // swap(m[0],m[1]) which swaps the first and second element
-  
-  NOT_IMPLEMENTED();
+  for(int i=m.size()-1; i>0; i--){
+    // Take random value in the range of unstruck value
+    int num = std::rand() % (i+1);
+    // Swap sorted number with the last element (unstruck)
+    std::swap(m[i], m[num]);
+  }
+
   }
 
 // HW5 3.4
@@ -253,19 +299,43 @@ Matrix compute_homography_ba(const vector<Match>& matches)
     double ny = matches[i].b->p.y;
     // TODO: fill in the matrices M and b.
     
-    NOT_IMPLEMENTED();
+    M[2*i][0] = mx;
+    M[2*i][1] = my;
+    M[2*i][2] = 1;
+    M[2*i][3] = 0;
+    M[2*i][4] = 0;
+    M[2*i][5] = 0;
+    M[2*i][6] = -nx*mx;
+    M[2*i][7] = -nx*my;
+
+    M[2*i+1][0] = 0;
+    M[2*i+1][1] = 0;
+    M[2*i+1][2] = 0;
+    M[2*i+1][3] = mx;
+    M[2*i+1][4] = my;
+    M[2*i+1][5] = 1;
+    M[2*i+1][6] = -ny*mx;
+    M[2*i+1][7] = -ny*my;
+
+    b[2*i][0] = nx;
+    b[2*i+1][0] = ny;
     
     }
   
-  
-  
   Matrix a = solve_system(M, b);
-  
+
   Matrix Hba(3, 3);
   // TODO: fill in the homography H based on the result in a.
-  
-  NOT_IMPLEMENTED();
-  
+  Hba[0][0] = a[0][0];
+  Hba[0][1] = a[1][0];
+  Hba[0][2] = a[2][0];
+  Hba[1][0] = a[3][0];
+  Hba[1][1] = a[4][0];
+  Hba[1][2] = a[5][0];
+  Hba[2][0] = a[6][0];
+  Hba[2][1] = a[7][0];
+  Hba[2][2] = 1.0;
+
   return Hba;
   }
 
@@ -283,9 +353,12 @@ Matrix RANSAC(vector<Match> m, float thresh, int k, int cutoff)
     //printf("Need at least 4 points for RANSAC! %zu supplied\n",m.size());
     return Matrix::identity(3,3);
     }
-  
+
   int best = 0;
   Matrix Hba = Matrix::translation_homography(256, 0);
+  vector<Match> inliers = model_inliers(Hba, m, thresh);
+  best = inliers.size();
+
   // TODO: fill in RANSAC algorithm.
   // for k iterations:
   //     shuffle the matches
@@ -296,9 +369,32 @@ Matrix RANSAC(vector<Match> m, float thresh, int k, int cutoff)
   //         if it's better than the cutoff:
   //             return it immediately
   // if we get to the end return the best homography
-  
-  NOT_IMPLEMENTED();
-  
+  // std::cout << "NUMERO MATCHES " << m.size() << " CUTOFF " << cutoff;
+  for(int i=0; i<=k; i++){
+    // Shuffle the matches
+    vector<Match> samples;
+    randomize_matches(m);
+    // Compute homography with 4 matches
+    for(int j=0; j<4; j++){
+      samples.push_back(m[j]);
+    }
+    Matrix H = compute_homography_ba(samples);
+    inliers = model_inliers(H, m, thresh);
+    // Verify if new homography is better than old one
+    if(inliers.size() > best){
+      // Update homograpohy with ALL inliers
+      for(int k=0; k<samples.size(); k++){
+        inliers.push_back(samples[k]);
+      }
+      H = compute_homography_ba(inliers);
+      Hba = H;
+      best = inliers.size();
+      // Break if cutoff reached
+      if(best>cutoff){
+        break;
+      }
+    }  
+  }
   return Hba;
   }
 
@@ -376,7 +472,7 @@ Image combine_images(const Image& a, const Image& b, const Matrix& Hba, float ab
       for(int i = 0; i < a.w; ++i)
         {
         // TODO: fill in.
-        NOT_IMPLEMENTED();
+        c(i-dx, j-dy, k) = a(i,j,k);
         }
   
   // TODO: Blend in image b as well.
@@ -392,9 +488,21 @@ Image combine_images(const Image& a, const Image& b, const Matrix& Hba, float ab
   // The member 
   
   // TODO: Put your code here.
-  
-  NOT_IMPLEMENTED();
-  
+  Point New_point;
+  Point Offset;
+  for(int k=0; k<c.c; ++k){
+    for(int j=0; j<c.h; j++){
+      for(int i=0; i<c.w; i++) {
+        Offset.x = i+dx;
+        Offset.y = j+dy;
+        New_point = project_point(Hba, Offset);
+        // Check if the projection falls inside the image b
+        if ((New_point.x >= 0 && New_point.x <= b.w) && (New_point.y >= 0 && New_point.y <= b.h)) {
+                c(i,j,k) = b.pixel_bilinear(New_point.x, New_point.y, k);
+        }
+      }
+    }
+  }
   
   // We trim the image so there are as few as possible black pixels.
   return trim_image(c);
@@ -413,7 +521,7 @@ Image panorama_image(const Image& a, const Image& b, float sigma, int corner_met
   // Calculate corners and descriptors
   vector<Descriptor> ad;
   vector<Descriptor> bd;
-  
+
   // doing it multithreading...
   thread tha([&](){ad = harris_corner_detector(a, sigma, thresh, window, nms, corner_method);});
   thread thb([&](){bd = harris_corner_detector(b, sigma, thresh, window, nms, corner_method);});
