@@ -69,8 +69,26 @@ Image mark_corners(const Image& im, const vector<Descriptor>& d)
 Image make_1d_gaussian(float sigma)
   {
   // TODO: make separable 1d Gaussian.
-  
-  NOT_IMPLEMENTED();
+      int size = ceil(6 * sigma);
+    if (size % 2 == 0) size += 1;
+
+    lin = Image(size, 1, 1); // aggiorna la dimensione corretta
+    int mid = size / 2;
+    float sum = 0;
+
+    for (int i = 0; i < size; ++i) {
+        int x = i - mid;
+        float val = exp(-(x * x) / (2 * sigma * sigma));
+        lin.set_pixel(i, 0, 0, val);
+        sum += val;
+    }
+
+    // Normalizza il filtro
+    for (int i = 0; i < size; ++i) {
+        float val = lin.get_pixel(i, 0, 0);
+        lin.set_pixel(i, 0, 0, val / sum);
+    }
+
   
   Image lin(1,1); // set to proper dimension
   lin.data[0]=1;
@@ -90,9 +108,11 @@ Image smooth_image(const Image& im, float sigma)
   // Hint: to make the filter from vertical to horizontal or vice versa
   // use "swap(filter.h,filter.w)"
   
-  NOT_IMPLEMENTED();
-  
-  return im;
+    Image gauss = make_1d_gaussian(sigma);
+    Image smooth = convolve_image(im, gauss, true);   // righe
+    smooth = convolve_image(smooth, gauss, false);    // colonne
+    return smooth;
+
   }
 
 
@@ -180,9 +200,26 @@ Image nms_image(const Image& im, int w)
   //         if neighbor response greater than pixel response:
   //             set response to be very low
   
-  NOT_IMPLEMENTED();
-  
-  return r;
+      Image result(im.w, im.h, 1);
+    for (int y = 0; y < im.h; ++y) {
+        for (int x = 0; x < im.w; ++x) {
+            float val = im.get_pixel(x, y, 0);
+            bool is_max = true;
+            for (int dy = -w; dy <= w; ++dy) {
+                for (int dx = -w; dx <= w; ++dx) {
+                    if (dx == 0 && dy == 0) continue;
+                    if (im.get_pixel(x + dx, y + dy, 0) > val) {
+                        is_max = false;
+                        break;
+                    }
+                }
+                if (!is_max) break;
+            }
+            result.set_pixel(x, y, 0, is_max ? val : -999999.0f);
+        }
+    }
+    return result;
+
   }
 
 
@@ -198,9 +235,20 @@ vector<Descriptor> detect_corners(const Image& im, const Image& nms, float thres
   //TODO: count number of responses over threshold (corners)
   //TODO: and fill in vector<Descriptor> with descriptors of corners, use describe_index.
   
-  NOT_IMPLEMENTED();
-  
-  return d;
+      vector<Descriptor> desc;
+    for (int y = 0; y < im.h; ++y) {
+        for (int x = 0; x < im.w; ++x) {
+            float val = nms.get_pixel(x, y, 0);
+            if (val > thresh) {
+                Descriptor d = describe_index(im, x, y, window);
+                d.p.x = x;
+                d.p.y = y;
+                desc.push_back(d);
+            }
+        }
+    }
+    return desc;
+
   }
 
 
