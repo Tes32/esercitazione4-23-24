@@ -114,8 +114,9 @@ Image structure_matrix(const Image& im2, float sigma)
   
   Image S(im.w, im.h, 3);
   // TODO: calculate structure matrix for im.
-  
-  NOT_IMPLEMENTED();
+    // Calcolo dei gradienti
+    Image Ix = convolve_image(im2, make_gx_filter(), false);
+    Image
   
   return S;
   }
@@ -129,6 +130,32 @@ Image cornerness_response(const Image& S, int method)
   {
   Image R(S.w, S.h);
   // TODO: fill in R, "cornerness" for each pixel using the structure matrix.
+Image cornerness_response(const Image& S, int method) {
+    Image R(S.w, S.h, 1);
+    for (int y = 0; y < S.h; ++y) {
+        for (int x = 0; x < S.w; ++x) {
+            float ix2 = S.get_pixel(x, y, 0);  // Ix^2
+            float iy2 = S.get_pixel(x, y, 1);  // Iy^2
+            float ixiy = S.get_pixel(x, y, 2); // IxIy
+
+            float det = ix2 * iy2 - ixiy * ixiy;
+            float trace = ix2 + iy2;
+            float r = 0;
+
+            if (method == 0) {
+                r = det / (trace + 1e-5);  // det(S)/tr(S), evita divisione per zero
+            } else if (method == 1) {
+                r = det - trace * trace;   // alternativa: det(S) - tr(S)^2
+            } else if (method == 2) {
+                r = std::min(ix2, iy2);    // alternativa: min degli autovalori
+            }
+
+            R.set_pixel(x, y, 0, r);
+        }
+    }
+    return R;
+}
+
   // We'll use formulation det(S) - alpha * trace(S)^2, alpha = .06.
   // E(S) = det(S) / trace(S)
   
