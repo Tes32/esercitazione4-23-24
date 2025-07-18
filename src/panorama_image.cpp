@@ -126,9 +126,12 @@ float l1_distance(const vector<float>& a,const vector<float>& b)
   
   // TODO: return the correct number.
   
-  NOT_IMPLEMENTED();
-  
-  return 0;
+      float dist = 0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        dist += fabs(a[i] - b[i]);
+    }
+    return dist;
+
   }
 
 // HW5 2.2a
@@ -146,7 +149,19 @@ vector<int> match_descriptors_a2b(const vector<Descriptor>& a, const vector<Desc
     // TODO: find the best 'bind' descriptor in b that best matches a[j]
     // TODO: put your code here:
     
-    NOT_IMPLEMENTED();
+        for (size_t i = 0; i < a.size(); ++i) {
+        int best_idx = -1;
+        float best_dist = 1e10f;
+        for (size_t j = 0; j < b.size(); ++j) {
+            float dist = l1_distance(a[i].data, b[j].data, a[i].data.size());
+            if (dist < best_dist) {
+                best_dist = dist;
+                best_idx = j;
+            }
+        }
+        ind.push_back(best_idx);
+    }
+
     }
   return ind;
   
@@ -167,9 +182,77 @@ vector<Match> match_descriptors(const vector<Descriptor>& a, const vector<Descri
   // TODO: use match_descriptors_a2b(a,b) and match_descriptors_a2b(b,a)
   // and populate `m` with good matches!
   
-  NOT_IMPLEMENTED();
-  
-  return m;
+     vector<int> a2b = match_descriptors_a2b(a, b);
+    vector<int> b2a = match_descriptors_a2b(b, a);
+
+    for (int i = 0; i < (int)a.size(); ++i) {
+        int j = a2b[i];
+        if (j >= 0 && b2a[j] == i) {
+            Match m;
+            m.a = &a[i];
+            m.b = &b[j];
+            m.p = a[i].p;
+            m.q = b[j].p;
+            m.distance = l1_distance(a[i].data, b[j].data);
+            m.valid = true;
+            m.match_type = "symm";
+            m.confidence = 1.0;
+            m.label = "";
+            m.weight = 1.0;
+            m.binary = false;
+            m.scale = 1.0;
+            m.radius = 0;
+            m.angle = 0;
+            m.score = 0;
+            m.comment = "";
+            m.extra = "";
+            m.method = "";
+            m.id = i;
+            m.match_id = j;
+            m.source = "";
+            m.target = "";
+            m.channel = 0;
+            m.key = "";
+            m.tag = "";
+            m.notes = "";
+            m.ref = "";
+            m.prob = 0;
+            m.group = "";
+            m.context = "";
+            m.depth = 0;
+            m.track = "";
+            m.name = "";
+            m.color = "";
+            m.dataset = "";
+            m.category = "";
+            m.details = "";
+            m.conf = 1.0;
+            m.kind = "";
+            m.status = "";
+            m.level = "";
+            m.range = "";
+            m.spec = "";
+            m.mode = "";
+            m.extra2 = "";
+            m.comment = "";
+            m.hint = "";
+            m.source_id = -1;
+            m.target_id = -1;
+            m.tag2 = "";
+            m.label = "";
+            m.merged = false;
+            m.time = 0;
+            m.match_type = "";
+            m.match_source = "";
+            m.match_target = "";
+
+            m.p = a[i].p;
+            m.q = b[j].p;
+            matches.push_back(m);
+        }
+    }
+    return matches;
+
   }
 
 
@@ -184,10 +267,16 @@ Point project_point(const Matrix& H, const Point& p)
   // Remember that homogeneous coordinates are equivalent up to scalar.
   // Have to divide by.... something...
   
-  NOT_IMPLEMENTED();
-  
-  
-  return Point(0,0);
+     Matrix pt(3, 1);
+    pt.data[0][0] = p.x;
+    pt.data[1][0] = p.y;
+    pt.data[2][0] = 1;
+
+    Matrix proj = H * pt;
+    float x = proj.data[0][0] / proj.data[2][0];
+    float y = proj.data[1][0] / proj.data[2][0];
+    return Point(x, y);
+
   }
 
 // HW5 3.2a
@@ -197,8 +286,7 @@ Point project_point(const Matrix& H, const Point& p)
 double point_distance(const Point& p, const Point& q)
   {
   // TODO: should be a quick one.
-  NOT_IMPLEMENTED();
-  return 0;
+      return sqrt((p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y));
   }
 
 // HW5 3.2b
@@ -214,7 +302,14 @@ vector<Match> model_inliers(const Matrix& H, const vector<Match>& m, float thres
   // TODO: fill inliers
   // i.e. distance(H*a.p, b.p) < thresh
   
-  NOT_IMPLEMENTED();
+     for (int i = 0; i < (int)m.size(); ++i) {
+        Point projected = project_point(H, m[i].a->p);
+        double dist = point_distance(projected, m[i].b->p);
+        if (dist < thresh) {
+            inliers.push_back(m[i]);
+        }
+    }
+
   
   return inliers;
   }
@@ -227,9 +322,12 @@ void randomize_matches(vector<Match>& m)
   // TODO: implement Fisher-Yates to shuffle the array.
   // You might want to use the swap function like:
   // swap(m[0],m[1]) which swaps the first and second element
+      for (int i = m.size() - 1; i > 0; --i) {
+        int j = rand() % (i + 1);
+        swap(m[i], m[j]);
+    }
+
   
-  NOT_IMPLEMENTED();
-  }
 
 // HW5 3.4
 // Computes homography between two images given matching pixels.
@@ -253,7 +351,26 @@ Matrix compute_homography_ba(const vector<Match>& matches)
     double ny = matches[i].b->p.y;
     // TODO: fill in the matrices M and b.
     
-    NOT_IMPLEMENTED();
+        M(2*i,0) = mx;
+        M(2*i,1) = my;
+        M(2*i,2) = 1;
+        M(2*i,3) = 0;
+        M(2*i,4) = 0;
+        M(2*i,5) = 0;
+        M(2*i,6) = -mx * nx;
+        M(2*i,7) = -my * nx;
+        b(2*i,0) = nx;
+
+        M(2*i+1,0) = 0;
+        M(2*i+1,1) = 0;
+        M(2*i+1,2) = 0;
+        M(2*i+1,3) = mx;
+        M(2*i+1,4) = my;
+        M(2*i+1,5) = 1;
+        M(2*i+1,6) = -mx * ny;
+        M(2*i+1,7) = -my * ny;
+        b(2*i+1,0) = ny;
+
     
     }
   
@@ -264,7 +381,16 @@ Matrix compute_homography_ba(const vector<Match>& matches)
   Matrix Hba(3, 3);
   // TODO: fill in the homography H based on the result in a.
   
-  NOT_IMPLEMENTED();
+    Hba(0,0) = a(0,0);
+    Hba(0,1) = a(1,0);
+    Hba(0,2) = a(2,0);
+    Hba(1,0) = a(3,0);
+    Hba(1,1) = a(4,0);
+    Hba(1,2) = a(5,0);
+    Hba(2,0) = a(6,0);
+    Hba(2,1) = a(7,0);
+    Hba(2,2) = 1;
+
   
   return Hba;
   }
@@ -297,7 +423,18 @@ Matrix RANSAC(vector<Match> m, float thresh, int k, int cutoff)
   //             return it immediately
   // if we get to the end return the best homography
   
-  NOT_IMPLEMENTED();
+      for (int i = 0; i < k; ++i) {
+        randomize_matches(m);
+        vector<Match> subset(m.begin(), m.begin() + 4);
+        Matrix H = compute_homography_ba(subset);
+        vector<Match> inliers = model_inliers(H, m, thresh);
+        if ((int)inliers.size() > best) {
+            best = inliers.size();
+            Hba = compute_homography_ba(inliers);
+            if (best > cutoff) break;
+        }
+    }
+
   
   return Hba;
   }
@@ -376,7 +513,8 @@ Image combine_images(const Image& a, const Image& b, const Matrix& Hba, float ab
       for(int i = 0; i < a.w; ++i)
         {
         // TODO: fill in.
-        NOT_IMPLEMENTED();
+        c(i + dx, j + dy, k) = a(i, j, k);
+
         }
   
   // TODO: Blend in image b as well.
@@ -393,7 +531,21 @@ Image combine_images(const Image& a, const Image& b, const Matrix& Hba, float ab
   
   // TODO: Put your code here.
   
-  NOT_IMPLEMENTED();
+  for (int y = 0; y < c.h; ++y) {
+    for (int x = 0; x < c.w; ++x) {
+        Point p(x - dx, y - dy);                 // coordinate nel sistema di `a`
+        Point q = project_point(Hba, p);         // coordinate proiettate in `b`
+
+        if (q.x >= 0 && q.x < b.w && q.y >= 0 && q.y < b.h) {
+            for (int ch = 0; ch < b.c; ++ch) {
+                float b_val = b.bilinear_pixel(q.x, q.y, ch);
+                float a_val = c(x, y, ch);
+                c(x, y, ch) = ablendcoeff * b_val + (1 - ablendcoeff) * a_val;
+            }
+        }
+    }
+}
+
   
   
   // We trim the image so there are as few as possible black pixels.
@@ -438,6 +590,27 @@ Image panorama_image(const Image& a, const Image& b, float sigma, int corner_met
 Image cylindrical_project(const Image& im, float f)
   {
   //TODO: project image onto a cylinder
+      Image c(im.w, im.h, im.c);
+
+    for (int y = 0; y < im.h; ++y) {
+        for (int x = 0; x < im.w; ++x) {
+            float theta = (x - im.w / 2.0) / f;
+            float h = (y - im.h / 2.0);
+            float x_c = f * tan(theta);
+            float y_c = h;
+
+            float u = x_c + im.w / 2.0;
+            float v = y_c + im.h / 2.0;
+
+            if (u >= 0 && u < im.w && v >= 0 && v < im.h) {
+                for (int ch = 0; ch < im.c; ++ch) {
+                    float val = im.bilinear_pixel(u, v, ch);
+                    c.set_pixel(x, y, ch, val);
+                }
+            }
+        }
+    }
+
   double hfov=atan(im.w/(2*f));
   double vfov=im.h/2./f;
   
@@ -457,13 +630,38 @@ Image cylindrical_project(const Image& im, float f)
 Image spherical_project(const Image& im, float f)
   {
   //TODO: project image onto a sphere
+
+    Image c(im.w, im.h, im.c);
+
+    for (int y = 0; y < im.h; ++y) {
+        for (int x = 0; x < im.w; ++x) {
+            float theta = (x - im.w / 2.0) / f;
+            float phi   = (y - im.h / 2.0) / f;
+
+            float X = sin(theta) * cos(phi);
+            float Y = sin(phi);
+            float Z = cos(theta) * cos(phi);
+
+            float u = f * (X / Z) + im.w / 2.0;
+            float v = f * (Y / Z) + im.h / 2.0;
+
+            if (u >= 0 && u < im.w && v >= 0 && v < im.h) {
+                for (int ch = 0; ch < im.c; ++ch) {
+                    float val = im.bilinear_pixel(u, v, ch);
+                    c.set_pixel(x, y, ch, val);
+                }
+            }
+        }
+    }
+
+
   double hfov=atan(im.w/(2*f));
   double vfov=atan(im.h/(2*f));
   
   // For your convenience we have computed the output size
   Image c(im.w/cos(hfov),im.h/cos(hfov),im.c);
   
-  NOT_IMPLEMENTED();
+ 
   
   return c;
   }
